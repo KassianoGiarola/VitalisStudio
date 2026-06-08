@@ -1,0 +1,51 @@
+{
+  "flutter": {
+    "platforms": {
+      "android": {
+        "default": {
+          "projectId": "vitalisstudio-6bb26",
+          "appId": "1:522347500122:android:e004dabc9d5168a6cebe63",
+          "fileOutput": "android/app/google-services.json"
+        }
+      },
+      "dart": {
+        "lib/firebase_options.dart": {
+          "projectId": "vitalisstudio-6bb26",
+          "configurations": {
+            "android": "1:522347500122:android:e004dabc9d5168a6cebe63",
+            "ios": "1:522347500122:ios:41b3bc0657eec054cebe63",
+            "web": "1:522347500122:web:91b6568fc042cc28cebe63"
+          }
+        }
+      }
+    }
+  },
+  "functions": [
+    {
+      "source": "functions",
+      "codebase": "default",
+      "disallowLegacyRuntimeConfig": true,
+      "ignore": [
+        "node_modules",
+        ".git",
+        "firebase-debug.log",
+        "firebase-debug.*.log",
+        "*.local"
+      ]
+    }
+  ],
+  "hosting": {
+    "public": "build/web",
+    "ignore": [
+      "firebase.json",
+      "**/.*",
+      "**/node_modules/**"
+    ],
+    "rewrites": [
+      {
+        "source": "**",
+        "destination": "/index.html"
+      }
+    ]
+  }
+}

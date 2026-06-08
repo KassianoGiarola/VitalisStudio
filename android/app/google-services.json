@@ -1,0 +1,90 @@
+{
+  "project_info": {
+    "project_number": "522347500122",
+    "project_id": "vitalisstudio-6bb26",
+    "storage_bucket": "vitalisstudio-6bb26.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:522347500122:android:bcf515645f720003cebe63",
+        "android_client_info": {
+          "package_name": "com.mycompany.vitalisstudio"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "522347500122-ifoj8c5a9cg3avjro16niad3r68cufmf.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.mycompany.vitalisstudio",
+            "certificate_hash": "9bbb3186b2189ef16d8f272bdab59362c395cbb4"
+          }
+        },
+        {
+          "client_id": "522347500122-r81fuevb3sk52kltahp7dmbdj9befagc.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCEggNt4aWrVC5NmZHPmPbaIw1dj4BLI0I"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "522347500122-r81fuevb3sk52kltahp7dmbdj9befagc.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "522347500122-mdsli6jf7j4f8kg68salv1c09nkmrllv.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.mycompany.vitalisstudio"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:522347500122:android:e004dabc9d5168a6cebe63",
+        "android_client_info": {
+          "package_name": "solumK.vitalisstudio.vitalisstudio"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "522347500122-r81fuevb3sk52kltahp7dmbdj9befagc.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCEggNt4aWrVC5NmZHPmPbaIw1dj4BLI0I"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "522347500122-r81fuevb3sk52kltahp7dmbdj9befagc.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "522347500122-mdsli6jf7j4f8kg68salv1c09nkmrllv.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.mycompany.vitalisstudio"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
