@@ -452,15 +452,31 @@ class _DashboardPageState extends State<DashboardPage> {
                               onSelecionar: _selecionarMes,
                             ),
                             const SizedBox(height: 12),
-                            SizedBox(
-                              height: 78,
-                              child: ListView.separated(
-                                scrollDirection: Axis.horizontal,
-                                itemCount: kpiCards.length,
-                                separatorBuilder: (_, _) =>
-                                    const SizedBox(width: 10),
-                                itemBuilder: (_, index) => kpiCards[index],
-                              ),
+                            LayoutBuilder(
+                              builder: (context, kpiConstraints) {
+                                final kpiWidth = kpiConstraints.maxWidth;
+                                final columns = kpiWidth >= 1500
+                                    ? 4
+                                    : kpiWidth >= 980
+                                    ? 3
+                                    : kpiWidth >= 620
+                                    ? 2
+                                    : 1;
+
+                                return GridView.builder(
+                                  shrinkWrap: true,
+                                  physics: const NeverScrollableScrollPhysics(),
+                                  gridDelegate:
+                                      SliverGridDelegateWithFixedCrossAxisCount(
+                                        crossAxisCount: columns,
+                                        crossAxisSpacing: 10,
+                                        mainAxisSpacing: 10,
+                                        mainAxisExtent: 92,
+                                      ),
+                                  itemCount: kpiCards.length,
+                                  itemBuilder: (_, index) => kpiCards[index],
+                                );
+                              },
                             ),
                             const SizedBox(height: 18),
                             if (isWide)
@@ -801,7 +817,7 @@ class _MetricCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: 230,
+      width: double.infinity,
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: Colors.white,
