@@ -354,6 +354,7 @@ class _DashboardPageState extends State<DashboardPage> {
                   }
 
                   final saldoMes = entradasMes - saidasMes;
+                  final lucroPrevistoMes = totalPrevistoMes - saidasMes;
                   final ticketMedio = qtdEntradasMes == 0
                       ? 0.0
                       : entradasMes / qtdEntradasMes;
@@ -416,6 +417,15 @@ class _DashboardPageState extends State<DashboardPage> {
                           subtitle: 'Recebido + aberto no mês',
                           icon: Icons.calendar_month_rounded,
                           color: VitalisColors.info,
+                        ),
+                        _MetricCard(
+                          title: 'Lucro previsto',
+                          value: _valorOuOculto(lucroPrevistoMes),
+                          subtitle: 'Previsto menos saídas',
+                          icon: Icons.auto_graph_rounded,
+                          color: lucroPrevistoMes >= 0
+                              ? VitalisColors.sucesso
+                              : VitalisColors.erro,
                         ),
                       ];
 
