@@ -27,6 +27,10 @@ class DashboardPage extends StatefulWidget {
 
 class _DashboardPageState extends State<DashboardPage> {
   bool _mostrarValores = false;
+  DateTime _mesSelecionado = DateTime(
+    DateTime.now().year,
+    DateTime.now().month,
+  );
 
   double _toDouble(dynamic valor) {
     if (valor == null) return 0.0;
@@ -44,9 +48,7 @@ class _DashboardPageState extends State<DashboardPage> {
     return _mostrarValores ? _formatarValor(valor) : '••••••';
   }
 
-  String _mesAtualTexto() {
-    final agora = DateTime.now();
-
+  String _mesTexto(DateTime data) {
     const meses = [
       'janeiro',
       'fevereiro',
@@ -62,32 +64,46 @@ class _DashboardPageState extends State<DashboardPage> {
       'dezembro',
     ];
 
-    return '${meses[agora.month - 1]} de ${agora.year}';
+    return '${meses[data.month - 1]} de ${data.year}';
   }
 
-  bool _isMesAtual(dynamic timestamp) {
+  bool _isMesSelecionado(dynamic timestamp) {
     if (timestamp is! Timestamp) return false;
 
     final data = timestamp.toDate();
-    final agora = DateTime.now();
-
-    return data.month == agora.month && data.year == agora.year;
+    return data.month == _mesSelecionado.month &&
+        data.year == _mesSelecionado.year;
   }
 
-  bool _isHojeOuMesAtual(dynamic timestamp) {
-    if (timestamp is! Timestamp) return false;
-
-    final data = timestamp.toDate();
-    final agora = DateTime.now();
-
-    return data.year == agora.year && data.month == agora.month;
+  void _alterarMes(int meses) {
+    setState(() {
+      _mesSelecionado = DateTime(
+        _mesSelecionado.year,
+        _mesSelecionado.month + meses,
+      );
+    });
   }
 
-  Stream<QuerySnapshot<Map<String, dynamic>>> _movimentacoesDoMesAtual() {
-    final agora = DateTime.now();
+  Future<void> _selecionarMes() async {
+    final selecionada = await showDatePicker(
+      context: context,
+      initialDate: _mesSelecionado,
+      firstDate: DateTime(2020),
+      lastDate: DateTime(2100, 12, 31),
+      helpText: 'Selecione uma data do mês desejado',
+    );
+
+    if (selecionada == null || !mounted) return;
+
+    setState(() {
+      _mesSelecionado = DateTime(selecionada.year, selecionada.month);
+    });
+  }
+
+  Stream<QuerySnapshot<Map<String, dynamic>>> _movimentacoesDoMesSelecionado() {
     return FinanceiroService.listarMovimentacoesPorPeriodo(
-      dataInicial: DateTime(agora.year, agora.month, 1),
-      dataFinal: DateTime(agora.year, agora.month + 1, 0),
+      dataInicial: DateTime(_mesSelecionado.year, _mesSelecionado.month, 1),
+      dataFinal: DateTime(_mesSelecionado.year, _mesSelecionado.month + 1, 0),
     );
   }
 
@@ -125,6 +141,33 @@ class _DashboardPageState extends State<DashboardPage> {
     final dias = vencSemHora.difference(hojeSemHora).inDays;
 
     return dias >= 0 && dias <= 3;
+  }
+
+  bool _estaEmAbertoAteMesSelecionado(Map<String, dynamic> data) {
+    final status = (data['status'] ?? '').toString().toLowerCase();
+    final inicioProximoMes = DateTime(
+      _mesSelecionado.year,
+      _mesSelecionado.month + 1,
+      1,
+    );
+
+    if (status == 'pago') {
+      final dataPagamento = data['dataPagamento'];
+      if (dataPagamento is! Timestamp ||
+          dataPagamento.toDate().isBefore(inicioProximoMes)) {
+        return false;
+      }
+    }
+
+    final referencia = data['vencimento'] is Timestamp
+        ? data['vencimento'] as Timestamp
+        : data['dataServico'] is Timestamp
+        ? data['dataServico'] as Timestamp
+        : null;
+
+    if (referencia == null) return true;
+
+    return referencia.toDate().isBefore(inicioProximoMes);
   }
 
   List<Widget> _buildActions() {
@@ -175,7 +218,7 @@ class _DashboardPageState extends State<DashboardPage> {
             stream: MensalidadeService.listarMensalidades(),
             builder: (context, mensalidadesSnapshot) {
               return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-                stream: _movimentacoesDoMesAtual(),
+                stream: _movimentacoesDoMesSelecionado(),
                 builder: (context, financeiroSnapshot) {
                   final carregando =
                       clientesSnapshot.connectionState ==
@@ -258,15 +301,13 @@ class _DashboardPageState extends State<DashboardPage> {
                   }).length;
 
                   double totalEmAberto = 0.0;
+                  int quantidadeEmAberto = 0;
                   double totalPrevistoMes = 0.0;
 
                   final servicosContagem = <String, int>{};
 
                   for (final doc in mensalidadesDocs) {
                     final data = doc.data();
-                    final status = (data['status'] ?? '')
-                        .toString()
-                        .toLowerCase();
                     final valor = _toDouble(
                       data['valorFinal'] ?? data['valorBase'],
                     );
@@ -276,15 +317,16 @@ class _DashboardPageState extends State<DashboardPage> {
                     servicosContagem[nomeServico] =
                         (servicosContagem[nomeServico] ?? 0) + 1;
 
-                    if (status != 'pago') {
+                    if (_estaEmAbertoAteMesSelecionado(data)) {
                       totalEmAberto += valor;
+                      quantidadeEmAberto++;
                     }
 
                     final vencimento = data['vencimento'];
                     final dataServico = data['dataServico'];
 
-                    if (_isHojeOuMesAtual(vencimento) ||
-                        _isHojeOuMesAtual(dataServico)) {
+                    if (_isMesSelecionado(vencimento) ||
+                        _isMesSelecionado(dataServico)) {
                       totalPrevistoMes += valor;
                     }
                   }
@@ -297,7 +339,7 @@ class _DashboardPageState extends State<DashboardPage> {
                   for (final doc in financeiroDocs) {
                     final data = doc.data();
 
-                    if (!_isMesAtual(data['createdAt'])) continue;
+                    if (!_isMesSelecionado(data['createdAt'])) continue;
 
                     final tipo = (data['tipo'] ?? '').toString();
                     final valor = _toDouble(data['valor']);
@@ -347,7 +389,7 @@ class _DashboardPageState extends State<DashboardPage> {
                         _MetricCard(
                           title: 'Resultado',
                           value: _valorOuOculto(saldoMes),
-                          subtitle: _mesAtualTexto(),
+                          subtitle: _mesTexto(_mesSelecionado),
                           icon: Icons.account_balance_wallet_rounded,
                           color: saldoMes >= 0
                               ? VitalisColors.sucesso
@@ -363,7 +405,8 @@ class _DashboardPageState extends State<DashboardPage> {
                         _MetricCard(
                           title: 'Em aberto',
                           value: _valorOuOculto(totalEmAberto),
-                          subtitle: '$mensalidadesPendentes pendente(s)',
+                          subtitle:
+                              '$quantidadeEmAberto até ${_mesTexto(_mesSelecionado)}',
                           icon: Icons.pending_actions_rounded,
                           color: VitalisColors.alerta,
                         ),
@@ -381,7 +424,7 @@ class _DashboardPageState extends State<DashboardPage> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             _DashboardHeader(
-                              mesAtual: _mesAtualTexto(),
+                              mesAtual: _mesTexto(_mesSelecionado),
                               resultado: _valorOuOculto(saldoMes),
                               positivo: saldoMes >= 0,
                               onToggleValues: () {
@@ -390,6 +433,13 @@ class _DashboardPageState extends State<DashboardPage> {
                                 });
                               },
                               mostrarValores: _mostrarValores,
+                            ),
+                            const SizedBox(height: 12),
+                            _FiltroMesDashboard(
+                              mes: _mesTexto(_mesSelecionado),
+                              onAnterior: () => _alterarMes(-1),
+                              onProximo: () => _alterarMes(1),
+                              onSelecionar: _selecionarMes,
                             ),
                             const SizedBox(height: 12),
                             SizedBox(
@@ -507,6 +557,83 @@ class _DashboardPageState extends State<DashboardPage> {
           );
         },
       ),
+    );
+  }
+}
+
+class _FiltroMesDashboard extends StatelessWidget {
+  final String mes;
+  final VoidCallback onAnterior;
+  final VoidCallback onProximo;
+  final VoidCallback onSelecionar;
+
+  const _FiltroMesDashboard({
+    required this.mes,
+    required this.onAnterior,
+    required this.onProximo,
+    required this.onSelecionar,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        const Text(
+          'Período financeiro',
+          style: TextStyle(
+            color: VitalisColors.azulMarinhoProfundo,
+            fontSize: 13,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+        const Spacer(),
+        IconButton(
+          tooltip: 'Mês anterior',
+          onPressed: onAnterior,
+          icon: const Icon(Icons.chevron_left_rounded),
+        ),
+        InkWell(
+          onTap: onSelecionar,
+          borderRadius: BorderRadius.circular(8),
+          child: Container(
+            constraints: const BoxConstraints(minWidth: 170),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: VitalisColors.borda),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(
+                  Icons.calendar_month_outlined,
+                  size: 18,
+                  color: VitalisColors.verdeEsmeralda,
+                ),
+                const SizedBox(width: 8),
+                Flexible(
+                  child: Text(
+                    mes,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: VitalisColors.azulMarinhoProfundo,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        IconButton(
+          tooltip: 'Próximo mês',
+          onPressed: onProximo,
+          icon: const Icon(Icons.chevron_right_rounded),
+        ),
+      ],
     );
   }
 }
