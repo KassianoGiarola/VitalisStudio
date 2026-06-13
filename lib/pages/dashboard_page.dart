@@ -705,7 +705,7 @@ class _DashboardHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: 290,
+      width: double.infinity,
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
         color: VitalisColors.azulMarinhoProfundo,
@@ -840,7 +840,7 @@ class _MetricCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: double.infinity,
+      width: 290,
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: Colors.white,
