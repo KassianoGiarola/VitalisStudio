@@ -83,6 +83,14 @@ class _DashboardPageState extends State<DashboardPage> {
     return data.year == agora.year && data.month == agora.month;
   }
 
+  Stream<QuerySnapshot<Map<String, dynamic>>> _movimentacoesDoMesAtual() {
+    final agora = DateTime.now();
+    return FinanceiroService.listarMovimentacoesPorPeriodo(
+      dataInicial: DateTime(agora.year, agora.month, 1),
+      dataFinal: DateTime(agora.year, agora.month + 1, 0),
+    );
+  }
+
   bool _mensalidadeVencida(Map<String, dynamic> data) {
     final status = (data['status'] ?? '').toString().toLowerCase();
 
@@ -167,7 +175,7 @@ class _DashboardPageState extends State<DashboardPage> {
             stream: MensalidadeService.listarMensalidades(),
             builder: (context, mensalidadesSnapshot) {
               return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-                stream: FinanceiroService.listarMovimentacoes(),
+                stream: _movimentacoesDoMesAtual(),
                 builder: (context, financeiroSnapshot) {
                   final carregando =
                       clientesSnapshot.connectionState ==
