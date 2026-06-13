@@ -108,13 +108,10 @@ class MensalidadeService {
     return da.month.compareTo(db.month);
   }
 
-  static Stream<QuerySnapshot<Map<String, dynamic>>> listarMensalidades({
-    int limite = 200,
-  }) {
-    return _mensalidadesRef
-        .orderBy('createdAt', descending: true)
-        .limit(limite)
-        .snapshots();
+  static Stream<QuerySnapshot<Map<String, dynamic>>> listarMensalidades() {
+    // A ordenacao por createdAt ocultava documentos antigos sem esse campo,
+    // e o limite fixo deixava de fora mensalidades acima dos 200 registros.
+    return _mensalidadesRef.snapshots();
   }
 
   static Stream<QuerySnapshot<Map<String, dynamic>>> listarClientes({
