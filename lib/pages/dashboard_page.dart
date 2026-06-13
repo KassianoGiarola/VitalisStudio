@@ -27,10 +27,32 @@ class DashboardPage extends StatefulWidget {
 
 class _DashboardPageState extends State<DashboardPage> {
   bool _mostrarValores = false;
+  final ScrollController _kpiScrollController = ScrollController();
   DateTime _mesSelecionado = DateTime(
     DateTime.now().year,
     DateTime.now().month,
   );
+
+  @override
+  void dispose() {
+    _kpiScrollController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _rolarIndicadores(double deslocamento) async {
+    if (!_kpiScrollController.hasClients) return;
+
+    final destino = (_kpiScrollController.offset + deslocamento).clamp(
+      0.0,
+      _kpiScrollController.position.maxScrollExtent,
+    );
+
+    await _kpiScrollController.animateTo(
+      destino,
+      duration: const Duration(milliseconds: 280),
+      curve: Curves.easeOutCubic,
+    );
+  }
 
   double _toDouble(dynamic valor) {
     if (valor == null) return 0.0;
@@ -397,11 +419,13 @@ class _DashboardPageState extends State<DashboardPage> {
                               : VitalisColors.erro,
                         ),
                         _MetricCard(
-                          title: 'Ticket médio',
-                          value: _valorOuOculto(ticketMedio),
-                          subtitle: 'Por entrada recebida',
-                          icon: Icons.analytics_rounded,
-                          color: VitalisColors.cobreQueimado,
+                          title: 'Lucro previsto',
+                          value: _valorOuOculto(lucroPrevistoMes),
+                          subtitle: 'Previsto menos saídas',
+                          icon: Icons.auto_graph_rounded,
+                          color: lucroPrevistoMes >= 0
+                              ? VitalisColors.sucesso
+                              : VitalisColors.erro,
                         ),
                         _MetricCard(
                           title: 'Em aberto',
@@ -417,15 +441,6 @@ class _DashboardPageState extends State<DashboardPage> {
                           subtitle: 'Recebido + aberto no mês',
                           icon: Icons.calendar_month_rounded,
                           color: VitalisColors.info,
-                        ),
-                        _MetricCard(
-                          title: 'Lucro previsto',
-                          value: _valorOuOculto(lucroPrevistoMes),
-                          subtitle: 'Previsto menos saídas',
-                          icon: Icons.auto_graph_rounded,
-                          color: lucroPrevistoMes >= 0
-                              ? VitalisColors.sucesso
-                              : VitalisColors.erro,
                         ),
                       ];
 
@@ -452,31 +467,37 @@ class _DashboardPageState extends State<DashboardPage> {
                               onSelecionar: _selecionarMes,
                             ),
                             const SizedBox(height: 12),
-                            LayoutBuilder(
-                              builder: (context, kpiConstraints) {
-                                final kpiWidth = kpiConstraints.maxWidth;
-                                final columns = kpiWidth >= 1500
-                                    ? 4
-                                    : kpiWidth >= 980
-                                    ? 3
-                                    : kpiWidth >= 620
-                                    ? 2
-                                    : 1;
-
-                                return GridView.builder(
-                                  shrinkWrap: true,
-                                  physics: const NeverScrollableScrollPhysics(),
-                                  gridDelegate:
-                                      SliverGridDelegateWithFixedCrossAxisCount(
-                                        crossAxisCount: columns,
-                                        crossAxisSpacing: 10,
-                                        mainAxisSpacing: 10,
-                                        mainAxisExtent: 92,
-                                      ),
-                                  itemCount: kpiCards.length,
-                                  itemBuilder: (_, index) => kpiCards[index],
-                                );
-                              },
+                            SizedBox(
+                              height: 92,
+                              child: Row(
+                                children: [
+                                  IconButton(
+                                    tooltip: 'Indicadores anteriores',
+                                    onPressed: () => _rolarIndicadores(-600),
+                                    icon: const Icon(
+                                      Icons.chevron_left_rounded,
+                                    ),
+                                  ),
+                                  Expanded(
+                                    child: ListView.separated(
+                                      controller: _kpiScrollController,
+                                      scrollDirection: Axis.horizontal,
+                                      itemCount: kpiCards.length,
+                                      separatorBuilder: (_, _) =>
+                                          const SizedBox(width: 10),
+                                      itemBuilder: (_, index) =>
+                                          kpiCards[index],
+                                    ),
+                                  ),
+                                  IconButton(
+                                    tooltip: 'Próximos indicadores',
+                                    onPressed: () => _rolarIndicadores(600),
+                                    icon: const Icon(
+                                      Icons.chevron_right_rounded,
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
                             const SizedBox(height: 18),
                             if (isWide)
@@ -490,6 +511,7 @@ class _DashboardPageState extends State<DashboardPage> {
                                       saidas: saidasMes,
                                       aberto: totalEmAberto,
                                       previsto: totalPrevistoMes,
+                                      lucroPrevisto: lucroPrevistoMes,
                                       formatarValor: _valorOuOculto,
                                     ),
                                   ),
@@ -517,6 +539,7 @@ class _DashboardPageState extends State<DashboardPage> {
                                     saidas: saidasMes,
                                     aberto: totalEmAberto,
                                     previsto: totalPrevistoMes,
+                                    lucroPrevisto: lucroPrevistoMes,
                                     formatarValor: _valorOuOculto,
                                   ),
                                   const SizedBox(height: 14),
@@ -682,7 +705,7 @@ class _DashboardHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: double.infinity,
+      width: 290,
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
         color: VitalisColors.azulMarinhoProfundo,
@@ -886,6 +909,7 @@ class _FinancialAnalysisCard extends StatelessWidget {
   final double saidas;
   final double aberto;
   final double previsto;
+  final double lucroPrevisto;
   final String Function(double) formatarValor;
 
   const _FinancialAnalysisCard({
@@ -893,6 +917,7 @@ class _FinancialAnalysisCard extends StatelessWidget {
     required this.saidas,
     required this.aberto,
     required this.previsto,
+    required this.lucroPrevisto,
     required this.formatarValor,
   });
 
@@ -903,6 +928,7 @@ class _FinancialAnalysisCard extends StatelessWidget {
       saidas.abs(),
       aberto.abs(),
       previsto.abs(),
+      lucroPrevisto.abs(),
       1.0,
     ].reduce((a, b) => a > b ? a : b);
 
@@ -947,6 +973,16 @@ class _FinancialAnalysisCard extends StatelessWidget {
               value: previsto,
               maxValue: maior,
               color: VitalisColors.info,
+              formatarValor: formatarValor,
+            ),
+            const SizedBox(height: 12),
+            _HorizontalMetricBar(
+              label: 'Lucro previsto',
+              value: lucroPrevisto,
+              maxValue: maior,
+              color: lucroPrevisto >= 0
+                  ? VitalisColors.sucesso
+                  : VitalisColors.erro,
               formatarValor: formatarValor,
             ),
           ],
