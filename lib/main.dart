@@ -322,14 +322,14 @@ class MyApp extends StatelessWidget {
         ),
 
         switchTheme: SwitchThemeData(
-          thumbColor: MaterialStateProperty.resolveWith((states) {
-            if (states.contains(MaterialState.selected)) {
+          thumbColor: WidgetStateProperty.resolveWith((states) {
+            if (states.contains(WidgetState.selected)) {
               return VitalisColors.verdeEsmeralda;
             }
             return VitalisColors.cinzaMedio;
           }),
-          trackColor: MaterialStateProperty.resolveWith((states) {
-            if (states.contains(MaterialState.selected)) {
+          trackColor: WidgetStateProperty.resolveWith((states) {
+            if (states.contains(WidgetState.selected)) {
               return VitalisColors.verdeEsmeralda.withOpacity(0.28);
             }
             return VitalisColors.cinzaClaro;
@@ -337,20 +337,20 @@ class MyApp extends StatelessWidget {
         ),
 
         checkboxTheme: CheckboxThemeData(
-          fillColor: MaterialStateProperty.resolveWith((states) {
-            if (states.contains(MaterialState.selected)) {
+          fillColor: WidgetStateProperty.resolveWith((states) {
+            if (states.contains(WidgetState.selected)) {
               return VitalisColors.verdeEsmeralda;
             }
             return Colors.transparent;
           }),
-          checkColor: MaterialStateProperty.all(Colors.white),
+          checkColor: WidgetStateProperty.all(Colors.white),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(5)),
           side: const BorderSide(color: VitalisColors.cinzaMedio, width: 1.4),
         ),
 
         radioTheme: RadioThemeData(
-          fillColor: MaterialStateProperty.resolveWith((states) {
-            if (states.contains(MaterialState.selected)) {
+          fillColor: WidgetStateProperty.resolveWith((states) {
+            if (states.contains(WidgetState.selected)) {
               return VitalisColors.verdeEsmeralda;
             }
             return VitalisColors.cinzaMedio;

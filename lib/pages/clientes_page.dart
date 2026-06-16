@@ -761,6 +761,10 @@ class _ClientesPageState extends State<ClientesPage> {
                                                 fontWeight: FontWeight.w600,
                                               ),
                                             ),
+                                            const SizedBox(height: 10),
+                                            _InicioServicosCliente(
+                                              clienteId: doc.id,
+                                            ),
                                             if (clienteNatacao &&
                                                 nomeCrianca
                                                     .trim()
@@ -970,6 +974,114 @@ class _ClienteInfoChip extends StatelessWidget {
       ),
     );
   }
+}
+
+class _InicioServicosCliente extends StatelessWidget {
+  final String clienteId;
+
+  const _InicioServicosCliente({required this.clienteId});
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+      stream: FirebaseFirestore.instance
+          .collection('mensalidades')
+          .where('clienteId', isEqualTo: clienteId)
+          .snapshots(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const SizedBox(
+            height: 20,
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: SizedBox(
+                width: 14,
+                height: 14,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ),
+            ),
+          );
+        }
+
+        final inicios = <String, _InicioServico>{};
+        for (final doc in snapshot.data?.docs ?? const []) {
+          final data = doc.data();
+          final tipoCobranca = (data['tipoCobranca'] ?? 'mensalidade')
+              .toString()
+              .toLowerCase();
+          final vencimento = data['vencimento'];
+          if (tipoCobranca != 'mensalidade' || vencimento is! Timestamp) {
+            continue;
+          }
+
+          final servicoId = (data['servicoId'] ?? '').toString().trim();
+          final nomeServico = (data['nomeServico'] ?? 'Serviço').toString();
+          final chave = servicoId.isNotEmpty
+              ? servicoId
+              : normalizarTexto(nomeServico);
+          final dataVencimento = vencimento.toDate();
+          final atual = inicios[chave];
+
+          if (atual == null || dataVencimento.isBefore(atual.data)) {
+            inicios[chave] = _InicioServico(
+              nome: nomeServico,
+              data: dataVencimento,
+            );
+          }
+        }
+
+        final servicos = inicios.values.toList()
+          ..sort((a, b) => a.data.compareTo(b.data));
+
+        if (servicos.isEmpty) {
+          return const Text(
+            'Início dos serviços: nenhuma mensalidade cadastrada',
+            style: TextStyle(
+              color: VitalisColors.cinzaMedio,
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+            ),
+          );
+        }
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Início dos serviços',
+              style: TextStyle(
+                color: VitalisColors.azulMarinhoProfundo,
+                fontSize: 12,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Wrap(
+              spacing: 8,
+              runSpacing: 6,
+              children: servicos
+                  .map(
+                    (servico) => _ClienteInfoChip(
+                      icon: Icons.event_available_outlined,
+                      texto:
+                          '${servico.nome}: ${formatarDataBrasileira(servico.data)}',
+                      cor: VitalisColors.verdeEsmeralda,
+                    ),
+                  )
+                  .toList(),
+            ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _InicioServico {
+  final String nome;
+  final DateTime data;
+
+  const _InicioServico({required this.nome, required this.data});
 }
 
 class _ClienteActionButton extends StatelessWidget {

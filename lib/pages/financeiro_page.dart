@@ -163,6 +163,78 @@ class _FinanceiroPageState extends State<FinanceiroPage> {
     );
   }
 
+  Future<void> _abrirEdicaoMovimentacao(
+    String id,
+    Map<String, dynamic> dados,
+  ) async {
+    if ((dados['mensalidadeId'] ?? '').toString().isNotEmpty) {
+      _mostrarMovimentacaoAutomatica();
+      return;
+    }
+
+    await showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => NovaMovimentacaoDialog(movimentacaoId: id, dados: dados),
+    );
+  }
+
+  Future<void> _excluirMovimentacao(
+    String id,
+    Map<String, dynamic> dados,
+  ) async {
+    if ((dados['mensalidadeId'] ?? '').toString().isNotEmpty) {
+      _mostrarMovimentacaoAutomatica();
+      return;
+    }
+
+    final confirmado = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Excluir movimentação?'),
+        content: Text(
+          'A movimentação "${(dados['descricao'] ?? 'Sem descrição')}" será excluída permanentemente.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: VitalisColors.erro),
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('Excluir'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmado != true) return;
+
+    try {
+      await FinanceiroService.excluirMovimentacao(id);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Movimentação excluída com sucesso.')),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Erro ao excluir movimentação: $error')),
+      );
+    }
+  }
+
+  void _mostrarMovimentacaoAutomatica() {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text(
+          'Esta movimentação foi gerada por uma mensalidade. Faça a alteração na página Mensalidades.',
+        ),
+      ),
+    );
+  }
+
   List<Widget> _buildActions() {
     return [
       if (isAdmin)
@@ -530,7 +602,8 @@ class _FinanceiroPageState extends State<FinanceiroPage> {
                         itemCount: docsFiltrados.length,
                         separatorBuilder: (_, _) => const SizedBox(height: 10),
                         itemBuilder: (_, i) {
-                          final data = docsFiltrados[i].data();
+                          final doc = docsFiltrados[i];
+                          final data = doc.data();
 
                           final tipo = (data['tipo'] ?? '').toString();
                           final valor = _toDouble(data['valor']);
@@ -622,6 +695,43 @@ class _FinanceiroPageState extends State<FinanceiroPage> {
                                       fontSize: 16,
                                     ),
                                   ),
+                                  if (isAdmin) ...[
+                                    const SizedBox(width: 4),
+                                    PopupMenuButton<String>(
+                                      tooltip: 'Ações',
+                                      onSelected: (acao) {
+                                        if (acao == 'editar') {
+                                          _abrirEdicaoMovimentacao(
+                                            doc.id,
+                                            data,
+                                          );
+                                        } else if (acao == 'excluir') {
+                                          _excluirMovimentacao(doc.id, data);
+                                        }
+                                      },
+                                      itemBuilder: (_) => const [
+                                        PopupMenuItem(
+                                          value: 'editar',
+                                          child: ListTile(
+                                            leading: Icon(Icons.edit_outlined),
+                                            title: Text('Editar'),
+                                            contentPadding: EdgeInsets.zero,
+                                          ),
+                                        ),
+                                        PopupMenuItem(
+                                          value: 'excluir',
+                                          child: ListTile(
+                                            leading: Icon(
+                                              Icons.delete_outline_rounded,
+                                              color: VitalisColors.erro,
+                                            ),
+                                            title: Text('Excluir'),
+                                            contentPadding: EdgeInsets.zero,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ],
                                 ],
                               ),
                             ),
@@ -638,7 +748,12 @@ class _FinanceiroPageState extends State<FinanceiroPage> {
 }
 
 class NovaMovimentacaoDialog extends StatefulWidget {
-  const NovaMovimentacaoDialog({super.key});
+  final String? movimentacaoId;
+  final Map<String, dynamic>? dados;
+
+  const NovaMovimentacaoDialog({super.key, this.movimentacaoId, this.dados});
+
+  bool get isEdicao => movimentacaoId != null;
 
   @override
   State<NovaMovimentacaoDialog> createState() => _NovaMovimentacaoDialogState();
@@ -662,6 +777,27 @@ class _NovaMovimentacaoDialogState extends State<NovaMovimentacaoDialog> {
     'cartao',
     'transferencia',
   ];
+
+  @override
+  void initState() {
+    super.initState();
+
+    final dados = widget.dados;
+    if (dados == null) return;
+
+    _tipo = (dados['tipo'] ?? 'saida').toString();
+    _forma = (dados['formaPagamento'] ?? 'dinheiro').toString();
+    _valorController.text = _toDouble(
+      dados['valor'],
+    ).toStringAsFixed(2).replaceAll('.', ',');
+    _descricaoController.text = (dados['descricao'] ?? '').toString();
+    _categoriaController.text = (dados['categoria'] ?? '').toString();
+  }
+
+  double _toDouble(dynamic valor) {
+    if (valor is num) return valor.toDouble();
+    return double.tryParse(valor?.toString() ?? '') ?? 0;
+  }
 
   @override
   void dispose() {
@@ -688,27 +824,51 @@ class _NovaMovimentacaoDialogState extends State<NovaMovimentacaoDialog> {
     setState(() => _loading = true);
 
     try {
-      await FinanceiroService.registrarMovimentacao(
-        tipo: _tipo,
-        valor: valor,
-        formaPagamento: _forma,
-        categoria: _categoriaController.text.trim().isEmpty
-            ? 'manual'
-            : _categoriaController.text.trim(),
-        descricao: _descricaoController.text.trim(),
-      );
+      final categoria = _categoriaController.text.trim().isEmpty
+          ? 'manual'
+          : _categoriaController.text.trim();
+      final descricao = _descricaoController.text.trim();
+
+      if (widget.isEdicao) {
+        await FinanceiroService.atualizarMovimentacao(
+          id: widget.movimentacaoId!,
+          tipo: _tipo,
+          valor: valor,
+          formaPagamento: _forma,
+          categoria: categoria,
+          descricao: descricao,
+        );
+      } else {
+        await FinanceiroService.registrarMovimentacao(
+          tipo: _tipo,
+          valor: valor,
+          formaPagamento: _forma,
+          categoria: categoria,
+          descricao: descricao,
+        );
+      }
 
       if (!mounted) return;
       Navigator.of(context).pop();
 
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Movimentação registrada com sucesso.')),
+        SnackBar(
+          content: Text(
+            widget.isEdicao
+                ? 'Movimentação atualizada com sucesso.'
+                : 'Movimentação registrada com sucesso.',
+          ),
+        ),
       );
-    } catch (_) {
+    } catch (error) {
       if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Erro ao registrar movimentação.')),
+        SnackBar(
+          content: Text(
+            'Erro ao ${widget.isEdicao ? 'atualizar' : 'registrar'} movimentação: $error',
+          ),
+        ),
       );
     } finally {
       if (mounted) {
@@ -724,9 +884,9 @@ class _NovaMovimentacaoDialogState extends State<NovaMovimentacaoDialog> {
     return AlertDialog(
       backgroundColor: VitalisColors.offWhite,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      title: const Text(
-        'Nova movimentação',
-        style: TextStyle(
+      title: Text(
+        widget.isEdicao ? 'Editar movimentação' : 'Nova movimentação',
+        style: const TextStyle(
           fontWeight: FontWeight.bold,
           color: VitalisColors.azulMarinhoProfundo,
         ),

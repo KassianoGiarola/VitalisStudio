@@ -370,6 +370,23 @@ class _AdminHomePageState extends State<AdminHomePage> {
     return dias >= 0 && dias <= 3;
   }
 
+  bool _estaEmAbertoAteMesAtual(Map<String, dynamic> data) {
+    final status = (data['status'] ?? '').toString().toLowerCase();
+    if (status == 'pago') return false;
+
+    final referencia = data['vencimento'] is Timestamp
+        ? data['vencimento'] as Timestamp
+        : data['dataServico'] is Timestamp
+        ? data['dataServico'] as Timestamp
+        : null;
+
+    if (referencia == null) return true;
+
+    final agora = DateTime.now();
+    final inicioProximoMes = DateTime(agora.year, agora.month + 1, 1);
+    return referencia.toDate().isBefore(inicioProximoMes);
+  }
+
   String _formatarDataCurta(dynamic timestamp) {
     if (timestamp is! Timestamp) return 'Sem data';
 
@@ -470,17 +487,16 @@ class _AdminHomePageState extends State<AdminHomePage> {
                 }).length;
 
                 double totalEmAberto = 0.0;
+                int quantidadeEmAberto = 0;
 
                 for (final doc in mensalidadesDocs) {
                   final data = doc.data();
-                  final status = (data['status'] ?? '')
-                      .toString()
-                      .toLowerCase();
 
-                  if (status != 'pago') {
+                  if (_estaEmAbertoAteMesAtual(data)) {
                     totalEmAberto += _toDouble(
                       data['valorFinal'] ?? data['valorBase'],
                     );
+                    quantidadeEmAberto++;
                   }
                 }
 
@@ -582,7 +598,7 @@ class _AdminHomePageState extends State<AdminHomePage> {
                         icon: Icons.account_balance_wallet_rounded,
                         title: 'Em aberto',
                         value: _valorOuOculto(totalEmAberto),
-                        subtitle: 'Ainda não recebido',
+                        subtitle: '$quantidadeEmAberto até o mês atual',
                         color: VitalisColors.cobreQueimado,
                         onTap: () => _onNavigate('mensalidades'),
                       ),

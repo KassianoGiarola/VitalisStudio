@@ -108,13 +108,14 @@ class MensalidadeService {
     return da.month.compareTo(db.month);
   }
 
-  static Stream<QuerySnapshot<Map<String, dynamic>>> listarMensalidades({
-    int limite = 200,
-  }) {
-    return _mensalidadesRef
-        .orderBy('createdAt', descending: true)
-        .limit(limite)
-        .snapshots();
+  static bool _mesmoDia(DateTime a, DateTime b) {
+    return a.year == b.year && a.month == b.month && a.day == b.day;
+  }
+
+  static Stream<QuerySnapshot<Map<String, dynamic>>> listarMensalidades() {
+    // A ordenacao por createdAt ocultava documentos antigos sem esse campo,
+    // e o limite fixo deixava de fora mensalidades acima dos 200 registros.
+    return _mensalidadesRef.snapshots();
   }
 
   static Stream<QuerySnapshot<Map<String, dynamic>>> listarClientes({
@@ -459,71 +460,94 @@ class MensalidadeService {
       final formaAntiga = (data['formaPagamento'] ?? '').toString();
       final valorAntigo = _toDouble(data['valorFinal']);
       final formaNova = (formaPagamento ?? formaAntiga).toString();
+      final tipoAntigo = (data['tipoCobranca'] ?? 'mensalidade').toString();
+      final descontoAntigo = _toDouble(data['desconto']);
+      final jurosAntigo = _toDouble(data['juros']);
+      final dataServicoAntiga = data['dataServico'] is Timestamp
+          ? (data['dataServico'] as Timestamp).toDate()
+          : null;
 
-      final pagamentoSnap = await _pagamentosRef
-          .where('mensalidadeId', isEqualTo: id)
-          .limit(1)
-          .get();
+      final dadosFinanceirosAlterados =
+          clienteIdAntigo != clienteId ||
+          (data['nomeCliente'] ?? '').toString() != nomeCliente ||
+          servicoIdAntigo != servicoId ||
+          (data['nomeServico'] ?? '').toString() != nomeServico ||
+          tipoAntigo != tipo ||
+          competenciaAntiga != competencia ||
+          (valorAntigo - valorFinal).abs() > 0.001 ||
+          (descontoAntigo - descontoSeguro).abs() > 0.001 ||
+          (jurosAntigo - jurosSeguro).abs() > 0.001 ||
+          formaAntiga != formaNova ||
+          (!mensalidade &&
+              (dataServicoAntiga == null ||
+                  !_mesmoDia(dataServicoAntiga, dataServico)));
 
-      if (pagamentoSnap.docs.isNotEmpty) {
-        batch.update(pagamentoSnap.docs.first.reference, {
-          'clienteId': clienteId,
-          'nomeCliente': nomeCliente,
-          'servicoId': servicoId,
-          'nomeServico': nomeServico,
-          'tipoCobranca': tipo,
-          'competencia': competencia,
-          'dataServico': Timestamp.fromDate(dataServico),
-          'valorOriginal': valorBase,
-          'desconto': descontoSeguro,
-          'juros': jurosSeguro,
-          'valorPago': valorFinal,
-          'formaPagamento': formaNova,
-        });
-      }
+      if (dadosFinanceirosAlterados) {
+        final pagamentoSnap = await _pagamentosRef
+            .where('mensalidadeId', isEqualTo: id)
+            .limit(1)
+            .get();
 
-      final movimentacaoSnap = await _movimentacoesFinanceirasRef
-          .where('mensalidadeId', isEqualTo: id)
-          .limit(1)
-          .get();
+        if (pagamentoSnap.docs.isNotEmpty) {
+          batch.update(pagamentoSnap.docs.first.reference, {
+            'clienteId': clienteId,
+            'nomeCliente': nomeCliente,
+            'servicoId': servicoId,
+            'nomeServico': nomeServico,
+            'tipoCobranca': tipo,
+            'competencia': competencia,
+            'dataServico': Timestamp.fromDate(dataServico),
+            'valorOriginal': valorBase,
+            'desconto': descontoSeguro,
+            'juros': jurosSeguro,
+            'valorPago': valorFinal,
+            'formaPagamento': formaNova,
+          });
+        }
 
-      if (movimentacaoSnap.docs.isNotEmpty) {
-        batch.update(movimentacaoSnap.docs.first.reference, {
-          'clienteId': clienteId,
-          'nomeCliente': nomeCliente,
-          'servicoId': servicoId,
-          'nomeServico': nomeServico,
-          'tipoCobranca': tipo,
-          'competencia': competencia,
-          'dataServico': Timestamp.fromDate(dataServico),
-          'valor': valorFinal,
-          'valorOriginal': valorBase,
-          'desconto': descontoSeguro,
-          'juros': jurosSeguro,
-          'formaPagamento': formaNova,
-          'subcategoria': nomeServico,
-          'descricao': mensalidade
-              ? 'Pagamento de mensalidade - $nomeServico - competência $competencia'
-              : 'Pagamento de serviço - $nomeServico',
-          'afetaCaixa': formaNova == 'dinheiro',
-        });
-      }
+        final movimentacaoSnap = await _movimentacoesFinanceirasRef
+            .where('mensalidadeId', isEqualTo: id)
+            .limit(1)
+            .get();
 
-      final antigoAfetavaCaixa = formaAntiga == 'dinheiro';
-      final novoAfetaCaixa = formaNova == 'dinheiro';
+        if (movimentacaoSnap.docs.isNotEmpty) {
+          batch.update(movimentacaoSnap.docs.first.reference, {
+            'clienteId': clienteId,
+            'nomeCliente': nomeCliente,
+            'servicoId': servicoId,
+            'nomeServico': nomeServico,
+            'tipoCobranca': tipo,
+            'competencia': competencia,
+            'dataServico': Timestamp.fromDate(dataServico),
+            'valor': valorFinal,
+            'valorOriginal': valorBase,
+            'desconto': descontoSeguro,
+            'juros': jurosSeguro,
+            'formaPagamento': formaNova,
+            'subcategoria': nomeServico,
+            'descricao': mensalidade
+                ? 'Pagamento de mensalidade - $nomeServico - competência $competencia'
+                : 'Pagamento de serviço - $nomeServico',
+            'afetaCaixa': formaNova == 'dinheiro',
+          });
+        }
 
-      if (antigoAfetavaCaixa && novoAfetaCaixa) {
-        ajusteCaixa = valorFinal - valorAntigo;
-      } else if (antigoAfetavaCaixa && !novoAfetaCaixa) {
-        ajusteCaixa = -valorAntigo;
-      } else if (!antigoAfetavaCaixa && novoAfetaCaixa) {
-        ajusteCaixa = valorFinal;
-      }
+        final antigoAfetavaCaixa = formaAntiga == 'dinheiro';
+        final novoAfetaCaixa = formaNova == 'dinheiro';
 
-      if (ajusteCaixa > 0) {
-        tipoAjusteCaixa = 'entrada';
-      } else if (ajusteCaixa < 0) {
-        tipoAjusteCaixa = 'saida';
+        if (antigoAfetavaCaixa && novoAfetaCaixa) {
+          ajusteCaixa = valorFinal - valorAntigo;
+        } else if (antigoAfetavaCaixa && !novoAfetaCaixa) {
+          ajusteCaixa = -valorAntigo;
+        } else if (!antigoAfetavaCaixa && novoAfetaCaixa) {
+          ajusteCaixa = valorFinal;
+        }
+
+        if (ajusteCaixa > 0) {
+          tipoAjusteCaixa = 'entrada';
+        } else if (ajusteCaixa < 0) {
+          tipoAjusteCaixa = 'saida';
+        }
       }
     }
 

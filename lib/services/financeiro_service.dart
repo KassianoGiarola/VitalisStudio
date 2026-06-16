@@ -11,7 +11,7 @@ class FinanceiroService {
       _firestore.collection('movimentacoes_financeiras');
 
   static Stream<QuerySnapshot<Map<String, dynamic>>> listarMovimentacoes({
-    int limite = 200,
+    int limite = 2000,
   }) {
     return _movRef
         .orderBy('createdAt', descending: true)
@@ -23,7 +23,7 @@ class FinanceiroService {
   listarMovimentacoesPorPeriodo({
     required DateTime dataInicial,
     required DateTime dataFinal,
-    int limite = 300,
+    int limite = 5000,
   }) {
     final inicio = DateTime(
       dataInicial.year,
